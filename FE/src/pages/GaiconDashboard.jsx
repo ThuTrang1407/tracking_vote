@@ -99,7 +99,7 @@ export default function GaiconDashboard() {
     // COLUMNS (TIME)
     // =========================
     const columns = useMemo(() => {
-        return [...new Set(filteredSnapshots.map((s) => formatTime(s.snapshotTime)))]
+        return [...new Set(filteredSnapshots.map((s) => s.snapshotTime))]
     }, [filteredSnapshots])
 
     // =========================
@@ -109,7 +109,7 @@ export default function GaiconDashboard() {
         const map = {}
 
         filteredSnapshots.forEach((snap) => {
-            const time = formatTime(snap.snapshotTime)
+            const time = snap.snapshotTime
             const candidateId = snap.candidateId
 
             if (!map[candidateId]) {
