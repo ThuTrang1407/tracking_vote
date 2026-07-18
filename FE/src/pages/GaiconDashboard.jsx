@@ -33,15 +33,14 @@ export default function GaiconDashboard() {
     // =========================
     // FORMAT TIME
     // =========================
-    const formatTime = (t) => {
+    const formatDateTime = (t) => {
         const d = new Date(t)
 
-        const day = String(d.getDate()).padStart(2, '0')
-        const month = String(d.getMonth() + 1).padStart(2, '0')
-        const hour = String(d.getHours()).padStart(2, '0')
-        const minute = String(d.getMinutes()).padStart(2, '0')
+        return {
+            date: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`,
 
-        return `${day}/${month} ${hour}:${minute}`
+            time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+        }
     }
 
     // =========================
@@ -187,9 +186,32 @@ export default function GaiconDashboard() {
                 <thead>
                     <tr>
                         <th>Candidate</th>
-                        {columns.map((t) => (
-                            <th key={t}>{t}</th>
-                        ))}
+                        {columns.map((t) => {
+                            const { date, time } = formatDateTime(t)
+
+                            return (
+                                <th key={t}>
+                                    <div
+                                        style={{
+                                            fontSize: 15,
+                                            fontWeight: 'bold',
+                                        }}
+                                    >
+                                        {time}
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            fontSize: 11,
+                                            opacity: 0.7,
+                                            marginTop: 3,
+                                        }}
+                                    >
+                                        {date}
+                                    </div>
+                                </th>
+                            )
+                        })}
                     </tr>
                 </thead>
 
