@@ -1,6 +1,6 @@
 const express = require("express");
 const prisma = require("../config/prisma");
-// const { groupByInterval } = require("../utils/snapshot.util");
+const snapshotController = require("../controllers/snapshot.controller");
 
 const router = express.Router();
 
@@ -91,5 +91,7 @@ router.get("/timeline", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+router.post("/update", snapshotController.update);
 
 module.exports = router;

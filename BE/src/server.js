@@ -5,6 +5,10 @@ const candidateRoute = require("./routes/candidate.route");
 
 app.use("/candidate", candidateRoute);
 
+const snapshotRoute = require("./routes/snapshot.route");
+
+app.use("/snapshot", snapshotRoute);
+
 // Start cron
 startWeChoiceCron();
 

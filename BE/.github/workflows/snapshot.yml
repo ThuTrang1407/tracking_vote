@@ -1,0 +1,18 @@
+name: Vote Snapshot
+
+on:
+  schedule:
+    # chạy mỗi 15 phút
+    - cron: "*/15 * * * *"
+
+  # cho phép bấm chạy tay để test
+  workflow_dispatch:
+
+jobs:
+  update-snapshot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call snapshot API
+        run: |
+          curl -X POST https://tracking-vote.onrender.com/snapshot/update
