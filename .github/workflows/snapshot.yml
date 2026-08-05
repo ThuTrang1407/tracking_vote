@@ -5,6 +5,7 @@ on:
     # Chạy mỗi 15 phút
     - cron: "*/15 * * * *"
 
+  # Cho phép chạy thủ công
   workflow_dispatch:
 
 jobs:
@@ -21,13 +22,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "npm"
 
-      # Cài dependency
+      # Cài dependencies
       - name: Install dependencies
         run: npm install
 
-      # Chạy snapshot
+      # Chạy job snapshot
       - name: Run snapshot
         run: npm run snapshot
         env:
