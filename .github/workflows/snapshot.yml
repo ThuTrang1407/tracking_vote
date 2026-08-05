@@ -5,7 +5,6 @@ on:
     # Chạy mỗi 15 phút
     - cron: "*/15 * * * *"
 
-  # Cho phép chạy thủ công
   workflow_dispatch:
 
 jobs:
@@ -13,22 +12,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Lấy source code
+      # Checkout source
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Cài Node.js
+      # Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # Cài dependencies
+      # Cài dependency trong BE
       - name: Install dependencies
+        working-directory: BE
         run: npm install
 
-      # Chạy job snapshot
+      # Generate Prisma Client
+      - name: Generate Prisma Client
+        working-directory: BE
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # Chạy snapshot
       - name: Run snapshot
+        working-directory: BE
         run: npm run snapshot
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
