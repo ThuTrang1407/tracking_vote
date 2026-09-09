@@ -48,25 +48,16 @@ export default function GaiconDashboard() {
     // 15m: chỉ hôm nay + 10 snapshot gần nhất
     // =========================
     const filteredSnapshots = useMemo(() => {
-        if (interval !== '15m') {
-            return snapshots
-        }
+    const latestTimes = [
+        ...new Set(snapshots.map((s) => s.snapshotTime))
+    ]
+        .sort((a, b) => new Date(a) - new Date(b))
+        .slice(-10)
 
-        const today = new Date()
-
-        // Chỉ lấy snapshot của hôm nay
-        const todaySnapshots = snapshots.filter((s) => {
-            const d = new Date(s.snapshotTime)
-
-            return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate()
-        })
-
-        // Lấy 10 mốc thời gian gần nhất
-        const latestTimes = [...new Set(todaySnapshots.map((s) => s.snapshotTime))].sort((a, b) => new Date(a) - new Date(b)).slice(-10)
-
-        // Giữ lại tất cả candidate thuộc 10 mốc đó
-        return todaySnapshots.filter((s) => latestTimes.includes(s.snapshotTime))
-    }, [snapshots, interval])
+    return snapshots.filter((s) =>
+        latestTimes.includes(s.snapshotTime)
+    )
+}, [snapshots])
 
     // =========================
     // ALL UNIQUE CANDIDATES (từ cả candidates + snapshots)

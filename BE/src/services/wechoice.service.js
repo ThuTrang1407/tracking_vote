@@ -4,7 +4,7 @@ const API_URL =
   "https://voting.net-solutions.vn/wechoice/v2/voting/vote-count";
 
 const sessionToken =
-  "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyQWdlbnQiOiJDaHJvbWUiLCJ1c2VySWQiOjIzMTcxNzk5OTc2MTE5OTksImVtYWlsIjoiYWRvcHR3ZWNob2ljZUBnbWFpbC5jb20iLCJpYXQiOjE3ODMxMzk4MjQsImV4cCI6MTc4Mzc0NDYyNH0.pZBetCsEfXGUefznes6QJN2OJqM2uCP7KEyBcHjoS5M"; // token bạn lấy từ network
+  "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyQWdlbnQiOiJDaHJvbWUiLCJ1c2VySWQiOjIzMTcxNzk5OTc2MTE5OTksImVtYWlsIjoiYWRvcHR3ZWNob2ljZUBnbWFpbC5jb20iLCJpYXQiOjE3ODMxMzk4MjQsImV4cCI6MTc4Mzc0NDYyNH0.pZBetCsEfXGUefznes6QJN2OJqM2uCP7KEyBcHjoS5M";
 
 const awardId = "1139348144316121089";
 
