@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+
 import { getTimeline } from '../services/snapshot.service'
 import { getCandidates } from '../services/candidate.service'
 
@@ -7,32 +8,103 @@ export default function GaiconDashboard() {
     const [snapshots, setSnapshots] = useState([])
     const [interval, setInterval] = useState('15m')
 
-    // =========================
-    // LOAD DATA
-    // =========================
-    useEffect(() => {
-        loadData()
-    }, [interval])
+    const [page, setPage] = useState(1)
+    const [cursorStack, setCursorStack] = useState([null])
+    const [nextCursor, setNextCursor] = useState(null)
+    const [loading, setLoading] = useState(false)
 
-    const loadData = async () => {
+    // =========================
+    // LOAD TIMELINE
+    // =========================
+
+    const loadTimeline = async (currentCursor = null) => {
         try {
-            const [candRes, snapRes] = await Promise.all([getCandidates(), getTimeline(interval)])
+            setLoading(true)
 
-            setCandidates(Array.isArray(candRes) ? candRes : [])
+            const data = await getTimeline(interval, currentCursor, 10)
 
-            const safeSnapshots = Array.isArray(snapRes) ? snapRes : snapRes?.data ? snapRes.data : []
+            const safeSnapshots = Array.isArray(data) ? data : []
 
             setSnapshots(safeSnapshots)
+
+            if (safeSnapshots.length > 0) {
+                const oldestSnapshot = safeSnapshots[safeSnapshots.length - 1]
+
+                setNextCursor(oldestSnapshot.bucketTime)
+            } else {
+                setNextCursor(null)
+            }
         } catch (err) {
-            console.error('LOAD ERROR:', err)
-            setCandidates([])
+            console.error('TIMELINE ERROR:', err)
+
             setSnapshots([])
+            setNextCursor(null)
+        } finally {
+            setLoading(false)
         }
     }
 
     // =========================
+    // PAGINATION
+    // =========================
+
+    const handleNext = async () => {
+        if (!nextCursor || loading) return
+
+        const newPage = page + 1
+
+        setCursorStack((prev) => [...prev, nextCursor])
+
+        setPage(newPage)
+
+        await loadTimeline(nextCursor)
+    }
+
+    const handlePrevious = async () => {
+        if (page <= 1 || loading) return
+
+        const previousPage = page - 1
+
+        const previousCursor = cursorStack[previousPage - 1]
+
+        setPage(previousPage)
+
+        setCursorStack((prev) => prev.slice(0, previousPage))
+
+        await loadTimeline(previousCursor)
+    }
+
+    // =========================
+    // INITIAL LOAD / CHANGE INTERVAL
+    // =========================
+
+    useEffect(() => {
+        const init = async () => {
+            try {
+                setPage(1)
+                setCursorStack([null])
+                setNextCursor(null)
+
+                const candRes = await getCandidates()
+
+                setCandidates(Array.isArray(candRes) ? candRes : [])
+
+                await loadTimeline(null)
+            } catch (err) {
+                console.error('LOAD ERROR:', err)
+
+                setCandidates([])
+                setSnapshots([])
+            }
+        }
+
+        init()
+    }, [interval])
+
+    // =========================
     // FORMAT TIME
     // =========================
+
     const formatDateTime = (t) => {
         const d = new Date(t)
 
@@ -45,27 +117,17 @@ export default function GaiconDashboard() {
 
     // =========================
     // FILTER SNAPSHOTS
-    // 15m: chỉ hôm nay + 10 snapshot gần nhất
     // =========================
-    const filteredSnapshots = useMemo(() => {
-    const latestTimes = [
-        ...new Set(snapshots.map((s) => s.snapshotTime))
-    ]
-        .sort((a, b) => new Date(a) - new Date(b))
-        .slice(-10)
 
-    return snapshots.filter((s) =>
-        latestTimes.includes(s.snapshotTime)
-    )
-}, [snapshots])
+    const filteredSnapshots = snapshots
 
     // =========================
-    // ALL UNIQUE CANDIDATES (từ cả candidates + snapshots)
+    // ALL UNIQUE CANDIDATES
     // =========================
+
     const allCandidates = useMemo(() => {
         const candidateMap = new Map()
 
-        // Thêm candidates từ API (có tên)
         candidates.forEach((c) => {
             candidateMap.set(c.id, {
                 id: c.id,
@@ -73,7 +135,6 @@ export default function GaiconDashboard() {
             })
         })
 
-        // Thêm tất cả candidateId từ snapshots (nếu chưa có)
         filteredSnapshots.forEach((snap) => {
             if (!candidateMap.has(snap.candidateId)) {
                 candidateMap.set(snap.candidateId, {
@@ -87,20 +148,18 @@ export default function GaiconDashboard() {
     }, [candidates, filteredSnapshots])
 
     // =========================
-    // COLUMNS (TIME)
+    // COLUMNS
     // =========================
+
     const columns = useMemo(() => {
-        return [...new Set(filteredSnapshots.map((s) => s.snapshotTime))]
+        return [...new Set(filteredSnapshots.map((s) => s.bucketTime))]
     }, [filteredSnapshots])
 
-    // =========================
-    // PIVOT DATA
-    // =========================
     const tableData = useMemo(() => {
         const map = {}
 
         filteredSnapshots.forEach((snap) => {
-            const time = snap.snapshotTime
+            const time = snap.bucketTime
             const candidateId = snap.candidateId
 
             if (!map[candidateId]) {
@@ -260,6 +319,47 @@ export default function GaiconDashboard() {
                     ))}
                 </tbody>
             </table>
+
+            <div
+                style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: 15,
+                    marginTop: 20,
+                    marginBottom: 30,
+                }}
+            >
+                <button
+                    onClick={handlePrevious}
+                    disabled={page === 1 || loading}
+                    style={{
+                        padding: '8px 16px',
+                        borderRadius: 8,
+                        border: 'none',
+                        cursor: page === 1 || loading ? 'not-allowed' : 'pointer',
+                        opacity: page === 1 || loading ? 0.5 : 1,
+                    }}
+                >
+                    ← Previous
+                </button>
+
+                <span>Page {page}</span>
+
+                <button
+                    onClick={handleNext}
+                    disabled={!nextCursor || loading}
+                    style={{
+                        padding: '8px 16px',
+                        borderRadius: 8,
+                        border: 'none',
+                        cursor: !nextCursor || loading ? 'not-allowed' : 'pointer',
+                        opacity: !nextCursor || loading ? 0.5 : 1,
+                    }}
+                >
+                    Next →
+                </button>
+            </div>
             <footer
                 style={{
                     marginTop: 'auto',
