@@ -1,27 +1,99 @@
 import { useEffect, useMemo, useState } from 'react'
-
 import { getTimeline } from '../services/snapshot.service'
-import { getCandidates } from '../services/candidate.service'
+import { getAwards, getCandidates } from '../services/candidate.service'
 
 export default function GaiconDashboard() {
+    const [awards, setAwards] = useState([])
+    const [selectedAward, setSelectedAward] = useState('')
+
     const [candidates, setCandidates] = useState([])
+    const [liveCandidates, setLiveCandidates] = useState([])
     const [snapshots, setSnapshots] = useState([])
+
     const [interval, setInterval] = useState('15m')
 
     const [page, setPage] = useState(1)
     const [cursorStack, setCursorStack] = useState([null])
     const [nextCursor, setNextCursor] = useState(null)
+
     const [loading, setLoading] = useState(false)
+    const [loadingAwards, setLoadingAwards] = useState(true)
+
+    // =========================
+    // LOAD AWARDS
+    // =========================
+
+    useEffect(() => {
+        const loadAwards = async () => {
+            try {
+                setLoadingAwards(true)
+
+                const data = await getAwards()
+
+                setAwards(Array.isArray(data) ? data : [])
+
+                if (data?.length > 0) {
+                    setSelectedAward(data[0].award_id)
+                }
+            } catch (err) {
+                console.error('AWARDS ERROR:', err)
+                setAwards([])
+            } finally {
+                setLoadingAwards(false)
+            }
+        }
+
+        loadAwards()
+    }, [])
+
+    // =========================
+    // LOAD CANDIDATES
+    // =========================
+
+    const loadCandidates = async () => {
+        if (!selectedAward) return
+
+        try {
+            const data = await getCandidates(selectedAward)
+
+            const safeData = Array.isArray(data) ? data : []
+
+            setCandidates(safeData)
+            setLiveCandidates(safeData)
+        } catch (err) {
+            console.error('CANDIDATES ERROR:', err)
+            setCandidates([])
+            setLiveCandidates([])
+        }
+    }
+
+    // =========================
+    // LOAD LIVE
+    // =========================
+
+    const loadLive = async () => {
+        if (!selectedAward) return
+
+        try {
+            const data = await getCandidates(selectedAward)
+
+            setLiveCandidates(Array.isArray(data) ? data : [])
+        } catch (err) {
+            console.error('LIVE ERROR:', err)
+        }
+    }
 
     // =========================
     // LOAD TIMELINE
     // =========================
 
     const loadTimeline = async (currentCursor = null) => {
+        if (!selectedAward) return
+
         try {
             setLoading(true)
 
-            const data = await getTimeline(interval, currentCursor, 10)
+            const data = await getTimeline(selectedAward, interval, currentCursor, 10)
 
             const safeSnapshots = Array.isArray(data) ? data : []
 
@@ -45,7 +117,121 @@ export default function GaiconDashboard() {
     }
 
     // =========================
-    // PAGINATION
+    // WHEN AWARD / INTERVAL CHANGES
+    // =========================
+
+    useEffect(() => {
+        if (!selectedAward) return
+
+        setPage(1)
+        setCursorStack([null])
+        setNextCursor(null)
+
+        loadCandidates()
+        loadTimeline(null)
+    }, [selectedAward, interval])
+
+    // =========================
+    // LIVE REFRESH EVERY 30 SEC
+    // =========================
+
+    useEffect(() => {
+        if (!selectedAward) return
+
+        loadLive()
+
+        const timer = setInterval(() => {
+            loadLive()
+        }, 30 * 1000)
+
+        return () => clearInterval(timer)
+    }, [selectedAward])
+
+    // =========================
+    // FORMAT TIME
+    // =========================
+
+    const formatDateTime = (time) => {
+        const date = new Date(time)
+
+        return {
+            date: `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`,
+
+            time: `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`,
+        }
+    }
+
+    // =========================
+    // ALL CANDIDATES
+    // =========================
+
+    const allCandidates = useMemo(() => {
+        const candidateMap = new Map()
+
+        candidates.forEach((candidate) => {
+            candidateMap.set(candidate.id, {
+                id: candidate.id,
+                name: candidate.name || `Candidate ${candidate.id}`,
+            })
+        })
+
+        snapshots.forEach((snapshot) => {
+            if (!candidateMap.has(snapshot.candidateId)) {
+                candidateMap.set(snapshot.candidateId, {
+                    id: snapshot.candidateId,
+                    name: `Candidate ${snapshot.candidateId}`,
+                })
+            }
+        })
+
+        return Array.from(candidateMap.values()).sort((a, b) => a.id - b.id)
+    }, [candidates, snapshots])
+
+    // =========================
+    // COLUMNS
+    // =========================
+
+    const columns = useMemo(() => {
+        return [...new Set(snapshots.map((snapshot) => snapshot.bucketTime))]
+    }, [snapshots])
+
+    // =========================
+    // TABLE DATA
+    // =========================
+
+    const tableData = useMemo(() => {
+        const map = {}
+
+        snapshots.forEach((snapshot) => {
+            const candidateId = snapshot.candidateId
+            const time = snapshot.bucketTime
+
+            if (!map[candidateId]) {
+                map[candidateId] = {}
+            }
+
+            map[candidateId][time] = snapshot.voteCount
+        })
+
+        return map
+    }, [snapshots])
+
+    // =========================
+    // LIVE MAP
+    // =========================
+
+    const liveMap = useMemo(() => {
+        const map = {}
+
+        liveCandidates.forEach((candidate) => {
+            map[candidate.id] = candidate.voteCount
+        })
+
+        return map
+    }, [liveCandidates])
+
+    // =========================
+    // NEXT
     // =========================
 
     const handleNext = async () => {
@@ -59,6 +245,10 @@ export default function GaiconDashboard() {
 
         await loadTimeline(nextCursor)
     }
+
+    // =========================
+    // PREVIOUS
+    // =========================
 
     const handlePrevious = async () => {
         if (page <= 1 || loading) return
@@ -75,319 +265,153 @@ export default function GaiconDashboard() {
     }
 
     // =========================
-    // INITIAL LOAD / CHANGE INTERVAL
+    // CURRENT AWARD
     // =========================
 
-    useEffect(() => {
-        const init = async () => {
-            try {
-                setPage(1)
-                setCursorStack([null])
-                setNextCursor(null)
+    const currentAward = awards.find((award) => award.award_id === selectedAward)
 
-                const candRes = await getCandidates()
-
-                setCandidates(Array.isArray(candRes) ? candRes : [])
-
-                await loadTimeline(null)
-            } catch (err) {
-                console.error('LOAD ERROR:', err)
-
-                setCandidates([])
-                setSnapshots([])
-            }
-        }
-
-        init()
-    }, [interval])
-
-    // =========================
-    // FORMAT TIME
-    // =========================
-
-    const formatDateTime = (t) => {
-        const d = new Date(t)
-
-        return {
-            date: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`,
-
-            time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
-        }
-    }
-
-    // =========================
-    // FILTER SNAPSHOTS
-    // =========================
-
-    const filteredSnapshots = snapshots
-
-    // =========================
-    // ALL UNIQUE CANDIDATES
-    // =========================
-
-    const allCandidates = useMemo(() => {
-        const candidateMap = new Map()
-
-        candidates.forEach((c) => {
-            candidateMap.set(c.id, {
-                id: c.id,
-                name: c.name || `Candidate ${c.id}`,
-            })
-        })
-
-        filteredSnapshots.forEach((snap) => {
-            if (!candidateMap.has(snap.candidateId)) {
-                candidateMap.set(snap.candidateId, {
-                    id: snap.candidateId,
-                    name: `Candidate ${snap.candidateId}`,
-                })
-            }
-        })
-
-        return Array.from(candidateMap.values()).sort((a, b) => a.id - b.id)
-    }, [candidates, filteredSnapshots])
-
-    // =========================
-    // COLUMNS
-    // =========================
-
-    const columns = useMemo(() => {
-        return [...new Set(filteredSnapshots.map((s) => s.bucketTime))]
-    }, [filteredSnapshots])
-
-    const tableData = useMemo(() => {
-        const map = {}
-
-        filteredSnapshots.forEach((snap) => {
-            const time = snap.bucketTime
-            const candidateId = snap.candidateId
-
-            if (!map[candidateId]) {
-                map[candidateId] = {}
-            }
-
-            map[candidateId][time] = snap.voteCount
-        })
-
-        return map
-    }, [filteredSnapshots])
-
-    // =========================
-    // RENDER
-    // =========================
     return (
-        <div
-            style={{
-                // padding: '0 20px',
-                minHeight: '100vh',
-                background: 'linear-gradient(135deg, #050505 0%, #111111 65%, #2a1145 100%)',
-                color: '#fff',
-                display: 'flex',
-                flexDirection: 'column',
-            }}
-        >
-            <h2>DASHBOARD</h2>
+        <div className="gaicon-dashboard">
+            <h1>📊 GAICON DASHBOARD</h1>
+
+            {/* =========================
+                FILTER BAR
+            ========================= */}
 
             <div
                 style={{
                     display: 'flex',
-                    gap: 10,
-                    marginBottom: 20,
-                    flexWrap: 'wrap',
+                    gap: '12px',
+                    alignItems: 'center',
+                    marginBottom: '20px',
                 }}
             >
-                {[
-                    { value: '15m', label: '15 phút' },
-                    { value: '1h', label: '1 giờ' },
-                    { value: '6h', label: '6 giờ' },
-                    { value: '1d', label: '1 ngày' },
-                ].map((item) => (
-                    <button
-                        key={item.value}
-                        onClick={() => setInterval(item.value)}
-                        style={{
-                            padding: '10px 20px',
-                            borderRadius: 10,
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontWeight: 'bold',
-                            fontSize: 14,
-                            color: '#fff',
-                            background: interval === item.value ? 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)' : 'linear-gradient(135deg, #c084fc 0%, #d8b4fe 100%)',
-                            boxShadow: interval === item.value ? '0 4px 12px rgba(124,58,237,.45)' : '0 2px 8px rgba(168,85,247,.25)',
-                            transition: 'all .25s ease',
-                        }}
-                    >
-                        {item.label}
-                    </button>
-                ))}
+                {/* AWARD */}
+
+                <label>
+                    Hạng mục:{' '}
+                    <select value={selectedAward} onChange={(e) => setSelectedAward(e.target.value)} disabled={loadingAwards}>
+                        {awards.map((award) => (
+                            <option key={award.award_id} value={award.award_id}>
+                                {award.name}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+
+                {/* INTERVAL */}
+
+                <label>
+                    Interval:{' '}
+                    <select value={interval} onChange={(e) => setInterval(e.target.value)}>
+                        <option value="15m">15m</option>
+                        <option value="1h">1h</option>
+                        <option value="6h">6h</option>
+                        <option value="1d">1d</option>
+                    </select>
+                </label>
             </div>
 
-            <table
-                border="1"
-                cellPadding="8"
-                style={{
-                    width: '100%',
-                    marginTop: 20,
-                    borderCollapse: 'collapse',
-                    textAlign: 'center',
-                }}
-            >
-                <thead>
-                    <tr>
-                        <th>Candidate</th>
-                        {columns.map((t) => {
-                            const { date, time } = formatDateTime(t)
+            {currentAward && (
+                <div style={{ marginBottom: '10px' }}>
+                    <strong>{currentAward.name}</strong>
+                </div>
+            )}
 
-                            return (
-                                <th key={t}>
-                                    <div
-                                        style={{
-                                            fontSize: 15,
-                                            fontWeight: 'bold',
-                                        }}
-                                    >
-                                        {time}
-                                    </div>
+            {/* =========================
+                TABLE
+            ========================= */}
 
-                                    <div
-                                        style={{
-                                            fontSize: 11,
-                                            opacity: 0.7,
-                                            marginTop: 3,
-                                        }}
-                                    >
-                                        {date}
-                                    </div>
-                                </th>
-                            )
-                        })}
-                    </tr>
-                </thead>
+            {loading ? (
+                <div>Loading...</div>
+            ) : (
+                <div
+                    style={{
+                        overflowX: 'auto',
+                    }}
+                >
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Candidate</th>
 
-                <tbody>
-                    {allCandidates.map((c) => (
-                        <tr key={c.id}>
-                            <td style={{ fontWeight: 'bold' }}>{c.name}</td>
+                                <th>Live</th>
 
-                            {columns.map((time, index) => {
-                                const value = tableData[c.id]?.[time]
+                                {columns.map((column) => {
+                                    const formatted = formatDateTime(column)
 
-                                let gap = null
+                                    return (
+                                        <th key={column}>
+                                            <div>{formatted.date}</div>
+                                            <div>{formatted.time}</div>
+                                        </th>
+                                    )
+                                })}
+                            </tr>
+                        </thead>
 
-                                if (index > 0) {
-                                    const prevTime = columns[index - 1]
-                                    const prevValue = tableData[c.id]?.[prevTime]
+                        <tbody>
+                            {allCandidates.map((candidate) => (
+                                <tr key={candidate.id}>
+                                    <td>{candidate.name}</td>
 
-                                    if (value !== undefined && prevValue !== undefined) {
-                                        gap = value - prevValue
-                                    }
-                                }
+                                    <td>{liveMap[candidate.id]?.toLocaleString() ?? '-'}</td>
 
-                                return (
-                                    <td key={time}>
-                                        {value !== undefined ? (
-                                            <>
-                                                <div
-                                                    style={{
-                                                        fontWeight: 'bold',
-                                                        fontSize: 15,
-                                                    }}
-                                                >
-                                                    {value.toLocaleString()}
-                                                </div>
+                                    {columns.map((column, index) => {
+                                        const current = tableData[candidate.id]?.[column]
 
-                                                {gap !== null && (
-                                                    <div
-                                                        style={{
-                                                            fontSize: 12,
-                                                            color: gap >= 0 ? 'green' : 'red',
-                                                        }}
-                                                    >
-                                                        {gap >= 0 ? '+' : ''}
-                                                        {gap.toLocaleString()}
+                                        const previousColumn = columns[index + 1]
+
+                                        const previous = previousColumn ? tableData[candidate.id]?.[previousColumn] : null
+
+                                        let change = '-'
+
+                                        if (current != null && previous != null) {
+                                            change = current - previous
+                                        }
+
+                                        return (
+                                            <td key={column}>
+                                                <div>{current == null ? '-' : current.toLocaleString()}</div>
+
+                                                {change !== '-' && (
+                                                    <div style={{ fontSize: '12px' }}>
+                                                        {change > 0 ? '+' : ''}
+                                                        {change.toLocaleString()}
                                                     </div>
                                                 )}
-                                            </>
-                                        ) : (
-                                            '-'
-                                        )}
-                                    </td>
-                                )
-                            })}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                                            </td>
+                                        )
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* =========================
+                PAGINATION
+            ========================= */}
 
             <div
                 style={{
                     display: 'flex',
-                    justifyContent: 'center',
+                    gap: '10px',
                     alignItems: 'center',
-                    gap: 15,
-                    marginTop: 20,
-                    marginBottom: 30,
+                    marginTop: '20px',
                 }}
             >
-                <button
-                    onClick={handlePrevious}
-                    disabled={page === 1 || loading}
-                    style={{
-                        padding: '8px 16px',
-                        borderRadius: 8,
-                        border: 'none',
-                        cursor: page === 1 || loading ? 'not-allowed' : 'pointer',
-                        opacity: page === 1 || loading ? 0.5 : 1,
-                    }}
-                >
-                    ← Previous
+                <button onClick={handlePrevious} disabled={page <= 1 || loading}>
+                    Previous
                 </button>
 
                 <span>Page {page}</span>
 
-                <button
-                    onClick={handleNext}
-                    disabled={!nextCursor || loading}
-                    style={{
-                        padding: '8px 16px',
-                        borderRadius: 8,
-                        border: 'none',
-                        cursor: !nextCursor || loading ? 'not-allowed' : 'pointer',
-                        opacity: !nextCursor || loading ? 0.5 : 1,
-                    }}
-                >
-                    Next →
+                <button onClick={handleNext} disabled={!nextCursor || loading}>
+                    Next
                 </button>
             </div>
-            <footer
-                style={{
-                    marginTop: 'auto',
-                    background: '#000',
-                    color: '#fff',
-                    textAlign: 'center',
-                    padding: '20px 0',
-                }}
-            >
-                <div
-                    style={{
-                        fontSize: 18,
-                        fontWeight: 'bold',
-                    }}
-                >
-                    For DongAnhQuynh 🐺
-                </div>
-
-                <div
-                    style={{
-                        marginTop: 6,
-                        fontSize: 14,
-                        opacity: 0.8,
-                    }}
-                >
-                    From Wolfies 💜
-                </div>
-            </footer>
         </div>
     )
 }
