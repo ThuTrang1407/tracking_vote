@@ -271,79 +271,189 @@ export default function GaiconDashboard() {
     const currentAward = awards.find((award) => award.award_id === selectedAward)
 
     return (
-        <div className="gaicon-dashboard">
-            <h1>📊 GAICON DASHBOARD</h1>
+        <div
+            style={{
+                minHeight: '100vh',
+                background: 'linear-gradient(135deg, #050505 0%, #111111 65%, #2a1145 100%)',
+                color: '#fff',
+                display: 'flex',
+                flexDirection: 'column',
+                boxSizing: 'border-box',
+            }}
+        >
+            {/* HEADER */}
+            <div
+                style={{
+                    marginBottom: 25,
+                }}
+            >
+                <h2
+                    style={{
+                        margin: 0,
+                        fontSize: 28,
+                        fontWeight: 800,
+                        letterSpacing: 1,
+                    }}
+                >
+                    DASHBOARD
+                </h2>
+            </div>
 
-            {/* =========================
-                FILTER BAR
-            ========================= */}
-
+            {/* FILTERS */}
             <div
                 style={{
                     display: 'flex',
-                    gap: '12px',
+                    gap: 12,
                     alignItems: 'center',
-                    marginBottom: '20px',
+                    flexWrap: 'wrap',
+                    marginBottom: 25,
                 }}
             >
                 {/* AWARD */}
+                <select
+                    value={selectedAward}
+                    onChange={(e) => setSelectedAward(e.target.value)}
+                    disabled={loadingAwards}
+                    style={{
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        border: '1px solid #6b21a8',
+                        background: '#18111f',
+                        color: '#fff',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        outline: 'none',
+                        cursor: 'pointer',
+                    }}
+                >
+                    {awards.map((award) => (
+                        <option key={award.award_id} value={award.award_id}>
+                            {award.name}
+                        </option>
+                    ))}
+                </select>
 
-                <label>
-                    Hạng mục:{' '}
-                    <select value={selectedAward} onChange={(e) => setSelectedAward(e.target.value)} disabled={loadingAwards}>
-                        {awards.map((award) => (
-                            <option key={award.award_id} value={award.award_id}>
-                                {award.name}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+                {/* INTERVAL BUTTONS */}
+                {[
+                    { value: '15m', label: '15 phút' },
+                    { value: '1h', label: '1 giờ' },
+                    { value: '6h', label: '6 giờ' },
+                    { value: '1d', label: '1 ngày' },
+                ].map((item) => (
+                    <button
+                        key={item.value}
+                        onClick={() => setInterval(item.value)}
+                        style={{
+                            padding: '10px 20px',
+                            borderRadius: 10,
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            fontSize: 14,
+                            color: '#fff',
 
-                {/* INTERVAL */}
+                            background: interval === item.value ? 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)' : 'linear-gradient(135deg, #c084fc 0%, #d8b4fe 100%)',
 
-                <label>
-                    Interval:{' '}
-                    <select value={interval} onChange={(e) => setInterval(e.target.value)}>
-                        <option value="15m">15m</option>
-                        <option value="1h">1h</option>
-                        <option value="6h">6h</option>
-                        <option value="1d">1d</option>
-                    </select>
-                </label>
+                            boxShadow: interval === item.value ? '0 4px 12px rgba(124,58,237,.45)' : '0 2px 8px rgba(168,85,247,.25)',
+
+                            transition: 'all .25s ease',
+                        }}
+                    >
+                        {item.label}
+                    </button>
+                ))}
             </div>
 
-            {currentAward && (
-                <div style={{ marginBottom: '10px' }}>
-                    <strong>{currentAward.name}</strong>
-                </div>
-            )}
-
-            {/* =========================
-                TABLE
-            ========================= */}
-
+            {/* TABLE */}
             {loading ? (
-                <div>Loading...</div>
+                <div
+                    style={{
+                        padding: 40,
+                        textAlign: 'center',
+                        color: '#c084fc',
+                    }}
+                >
+                    Loading...
+                </div>
             ) : (
                 <div
                     style={{
                         overflowX: 'auto',
+                        borderRadius: 14,
+                        border: '1px solid #3b2454',
+                        background: 'rgba(15, 10, 20, 0.75)',
+                        boxShadow: '0 8px 30px rgba(0,0,0,.35)',
                     }}
                 >
-                    <table>
+                    <table
+                        style={{
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            textAlign: 'center',
+                            minWidth: 900,
+                        }}
+                    >
                         <thead>
-                            <tr>
-                                <th>Candidate</th>
+                            <tr
+                                style={{
+                                    background: 'linear-gradient(135deg, #24103a 0%, #3b1760 100%)',
+                                }}
+                            >
+                                <th
+                                    style={{
+                                        padding: '14px 18px',
+                                        textAlign: 'left',
+                                        position: 'sticky',
+                                        left: 0,
+                                        background: '#24103a',
+                                        zIndex: 2,
+                                        minWidth: 180,
+                                        borderBottom: '1px solid #5b2a7d',
+                                    }}
+                                >
+                                    Candidate
+                                </th>
 
-                                <th>Live</th>
+                                <th
+                                    style={{
+                                        padding: '14px 18px',
+                                        minWidth: 110,
+                                        borderBottom: '1px solid #5b2a7d',
+                                    }}
+                                >
+                                    Live
+                                </th>
 
                                 {columns.map((column) => {
                                     const formatted = formatDateTime(column)
 
                                     return (
-                                        <th key={column}>
-                                            <div>{formatted.date}</div>
-                                            <div>{formatted.time}</div>
+                                        <th
+                                            key={column}
+                                            style={{
+                                                padding: '10px 14px',
+                                                minWidth: 100,
+                                                borderBottom: '1px solid #5b2a7d',
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    fontSize: 15,
+                                                    fontWeight: 800,
+                                                }}
+                                            >
+                                                {formatted.time}
+                                            </div>
+
+                                            <div
+                                                style={{
+                                                    fontSize: 11,
+                                                    opacity: 0.65,
+                                                    marginTop: 3,
+                                                }}
+                                            >
+                                                {formatted.date}
+                                            </div>
                                         </th>
                                     )
                                 })}
@@ -351,12 +461,42 @@ export default function GaiconDashboard() {
                         </thead>
 
                         <tbody>
-                            {allCandidates.map((candidate) => (
-                                <tr key={candidate.id}>
-                                    <td>{candidate.name}</td>
+                            {allCandidates.map((candidate, rowIndex) => (
+                                <tr
+                                    key={candidate.id}
+                                    style={{
+                                        background: rowIndex % 2 === 0 ? 'rgba(255,255,255,0.025)' : 'rgba(124,58,237,0.06)',
+                                    }}
+                                >
+                                    {/* CANDIDATE */}
+                                    <td
+                                        style={{
+                                            padding: '14px 18px',
+                                            textAlign: 'left',
+                                            fontWeight: 700,
+                                            position: 'sticky',
+                                            left: 0,
+                                            background: '#120d18',
+                                            zIndex: 1,
+                                            borderBottom: '1px solid #2c2035',
+                                        }}
+                                    >
+                                        {candidate.name}
+                                    </td>
 
-                                    <td>{liveMap[candidate.id]?.toLocaleString() ?? '-'}</td>
+                                    {/* LIVE */}
+                                    <td
+                                        style={{
+                                            padding: '10px 14px',
+                                            fontWeight: 800,
+                                            color: '#d8b4fe',
+                                            borderBottom: '1px solid #2c2035',
+                                        }}
+                                    >
+                                        {liveMap[candidate.id]?.toLocaleString() ?? '-'}
+                                    </td>
 
+                                    {/* SNAPSHOTS */}
                                     {columns.map((column, index) => {
                                         const current = tableData[candidate.id]?.[column]
 
@@ -371,11 +511,31 @@ export default function GaiconDashboard() {
                                         }
 
                                         return (
-                                            <td key={column}>
-                                                <div>{current == null ? '-' : current.toLocaleString()}</div>
+                                            <td
+                                                key={column}
+                                                style={{
+                                                    padding: '10px 14px',
+                                                    borderBottom: '1px solid #2c2035',
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        fontWeight: 800,
+                                                        fontSize: 14,
+                                                    }}
+                                                >
+                                                    {current == null ? '-' : current.toLocaleString()}
+                                                </div>
 
                                                 {change !== '-' && (
-                                                    <div style={{ fontSize: '12px' }}>
+                                                    <div
+                                                        style={{
+                                                            marginTop: 4,
+                                                            fontSize: 12,
+                                                            fontWeight: 600,
+                                                            color: change > 0 ? '#4ade80' : change < 0 ? '#f87171' : '#9ca3af',
+                                                        }}
+                                                    >
                                                         {change > 0 ? '+' : ''}
                                                         {change.toLocaleString()}
                                                     </div>
@@ -390,28 +550,91 @@ export default function GaiconDashboard() {
                 </div>
             )}
 
-            {/* =========================
-                PAGINATION
-            ========================= */}
-
+            {/* PAGINATION */}
             <div
                 style={{
                     display: 'flex',
-                    gap: '10px',
+                    justifyContent: 'center',
                     alignItems: 'center',
-                    marginTop: '20px',
+                    gap: 15,
+                    marginTop: 25,
                 }}
             >
-                <button onClick={handlePrevious} disabled={page <= 1 || loading}>
-                    Previous
+                <button
+                    onClick={handlePrevious}
+                    disabled={page <= 1 || loading}
+                    style={{
+                        padding: '9px 18px',
+                        borderRadius: 9,
+                        border: '1px solid #6b21a8',
+                        background: page <= 1 || loading ? '#241c29' : '#3b1760',
+                        color: page <= 1 || loading ? '#777' : '#fff',
+                        cursor: page <= 1 || loading ? 'not-allowed' : 'pointer',
+                        fontWeight: 600,
+                    }}
+                >
+                    ← Previous
                 </button>
 
-                <span>Page {page}</span>
+                <span
+                    style={{
+                        fontWeight: 700,
+                        color: '#d8b4fe',
+                    }}
+                >
+                    Page {page}
+                </span>
 
-                <button onClick={handleNext} disabled={!nextCursor || loading}>
-                    Next
+                <button
+                    onClick={handleNext}
+                    disabled={!nextCursor || loading}
+                    style={{
+                        padding: '9px 18px',
+                        borderRadius: 9,
+                        border: '1px solid #6b21a8',
+                        background: !nextCursor || loading ? '#241c29' : '#3b1760',
+                        color: !nextCursor || loading ? '#777' : '#fff',
+                        cursor: !nextCursor || loading ? 'not-allowed' : 'pointer',
+                        fontWeight: 600,
+                    }}
+                >
+                    Next →
                 </button>
             </div>
+
+            {/* FOOTER */}
+            <footer
+                style={{
+                    width: '100%',
+                    padding: '18px 30px',
+                    marginTop: '30px',
+                    boxSizing: 'border-box',
+                    textAlign: 'center',
+                    background: 'rgba(42, 17, 69, 0.35)',
+                    borderTop: '1px solid rgba(168, 85, 247, 0.18)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                }}
+            >
+                <div
+                    style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                    }}
+                >
+                    For DongAnhQuynh 🐺
+                </div>
+
+                <div
+                    style={{
+                        marginTop: '4px',
+                        fontSize: '13px',
+                        opacity: 0.65,
+                    }}
+                >
+                    From Wolfies 💜
+                </div>
+            </footer>
         </div>
     )
 }
