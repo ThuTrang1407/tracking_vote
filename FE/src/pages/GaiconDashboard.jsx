@@ -1,28 +1,34 @@
 import { useEffect, useMemo, useState } from 'react'
+
 import { getTimeline } from '../services/snapshot.service'
+
 import { getAwards, getCandidates } from '../services/candidate.service'
 
 export default function GaiconDashboard() {
     const [awards, setAwards] = useState([])
+
     const [selectedAward, setSelectedAward] = useState('')
 
     const [candidates, setCandidates] = useState([])
+
     const [liveCandidates, setLiveCandidates] = useState([])
+
     const [snapshots, setSnapshots] = useState([])
 
     const [interval, setInterval] = useState('15m')
 
     const [page, setPage] = useState(1)
+
     const [cursorStack, setCursorStack] = useState([null])
+
     const [nextCursor, setNextCursor] = useState(null)
 
     const [loading, setLoading] = useState(false)
+
     const [loadingAwards, setLoadingAwards] = useState(true)
-
-    // =========================
-    // LOAD AWARDS
     // =========================
 
+    // LOAD AWARDS// =========================
     useEffect(() => {
         const loadAwards = async () => {
             try {
@@ -37,6 +43,7 @@ export default function GaiconDashboard() {
                 }
             } catch (err) {
                 console.error('AWARDS ERROR:', err)
+
                 setAwards([])
             } finally {
                 setLoadingAwards(false)
@@ -45,11 +52,9 @@ export default function GaiconDashboard() {
 
         loadAwards()
     }, [])
-
-    // =========================
-    // LOAD CANDIDATES
     // =========================
 
+    // LOAD CANDIDATES// =========================
     const loadCandidates = async () => {
         if (!selectedAward) return
 
@@ -59,18 +64,19 @@ export default function GaiconDashboard() {
             const safeData = Array.isArray(data) ? data : []
 
             setCandidates(safeData)
+
             setLiveCandidates(safeData)
         } catch (err) {
             console.error('CANDIDATES ERROR:', err)
+
             setCandidates([])
+
             setLiveCandidates([])
         }
     }
-
-    // =========================
-    // LOAD LIVE
     // =========================
 
+    // LOAD LIVE// =========================
     const loadLive = async () => {
         if (!selectedAward) return
 
@@ -82,59 +88,55 @@ export default function GaiconDashboard() {
             console.error('LIVE ERROR:', err)
         }
     }
-
-    // =========================
-    // LOAD TIMELINE
     // =========================
 
+    // LOAD TIMELINE// =========================
     const loadTimeline = async (currentCursor = null) => {
         if (!selectedAward) return
 
         try {
             setLoading(true)
-
-            const data = await getTimeline(selectedAward, interval, currentCursor, 10)
-
+            // Fetch 11 buckets: display the first 10 and keep the 11th
+            // only for calculating the change in the last visible column.
+            const data = await getTimeline(selectedAward, interval, currentCursor, 11)
             const safeSnapshots = Array.isArray(data) ? data : []
+            const allBucketTimes = [...new Set(safeSnapshots.map((snapshot) => snapshot.bucketTime))]
+            const visibleBucketTimes = allBucketTimes.slice(0, 10)
 
             setSnapshots(safeSnapshots)
 
-            if (safeSnapshots.length > 0) {
-                const oldestSnapshot = safeSnapshots[safeSnapshots.length - 1]
-
-                setNextCursor(oldestSnapshot.bucketTime)
-            } else {
-                setNextCursor(null)
-            }
+            // Cursor is the oldest visible bucket, so the hidden comparison
+            // bucket becomes the first visible bucket on the next page.
+            setNextCursor(allBucketTimes.length > 10 ? visibleBucketTimes[visibleBucketTimes.length - 1] : null)
         } catch (err) {
             console.error('TIMELINE ERROR:', err)
 
             setSnapshots([])
+
             setNextCursor(null)
         } finally {
             setLoading(false)
         }
     }
-
-    // =========================
-    // WHEN AWARD / INTERVAL CHANGES
     // =========================
 
+    // WHEN AWARD / INTERVAL CHANGES// =========================
     useEffect(() => {
         if (!selectedAward) return
 
         setPage(1)
+
         setCursorStack([null])
+
         setNextCursor(null)
 
         loadCandidates()
+
         loadTimeline(null)
     }, [selectedAward, interval])
-
-    // =========================
-    // LIVE REFRESH EVERY 30 SEC
     // =========================
 
+    // LIVE REFRESH EVERY 30 SEC// =========================
     useEffect(() => {
         if (!selectedAward) return
 
@@ -146,11 +148,9 @@ export default function GaiconDashboard() {
 
         return () => clearInterval(timer)
     }, [selectedAward])
-
-    // =========================
-    // FORMAT TIME
     // =========================
 
+    // FORMAT TIME// =========================
     const formatDateTime = (time) => {
         const date = new Date(time)
 
@@ -160,17 +160,16 @@ export default function GaiconDashboard() {
             time: `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`,
         }
     }
-
-    // =========================
-    // ALL CANDIDATES
     // =========================
 
+    // ALL CANDIDATES// =========================
     const allCandidates = useMemo(() => {
         const candidateMap = new Map()
 
         candidates.forEach((candidate) => {
             candidateMap.set(candidate.id, {
                 id: candidate.id,
+
                 name: candidate.name || `Candidate ${candidate.id}`,
             })
         })
@@ -179,6 +178,7 @@ export default function GaiconDashboard() {
             if (!candidateMap.has(snapshot.candidateId)) {
                 candidateMap.set(snapshot.candidateId, {
                     id: snapshot.candidateId,
+
                     name: `Candidate ${snapshot.candidateId}`,
                 })
             }
@@ -186,24 +186,24 @@ export default function GaiconDashboard() {
 
         return Array.from(candidateMap.values()).sort((a, b) => a.id - b.id)
     }, [candidates, snapshots])
-
-    // =========================
-    // COLUMNS
     // =========================
 
-    const columns = useMemo(() => {
+    // COLUMNS// =========================
+    // Include the hidden 11th bucket for comparison, but display only 10.
+    const allColumns = useMemo(() => {
         return [...new Set(snapshots.map((snapshot) => snapshot.bucketTime))]
     }, [snapshots])
 
-    // =========================
-    // TABLE DATA
+    const columns = useMemo(() => allColumns.slice(0, 10), [allColumns])
     // =========================
 
+    // TABLE DATA// =========================
     const tableData = useMemo(() => {
         const map = {}
 
         snapshots.forEach((snapshot) => {
             const candidateId = snapshot.candidateId
+
             const time = snapshot.bucketTime
 
             if (!map[candidateId]) {
@@ -215,11 +215,9 @@ export default function GaiconDashboard() {
 
         return map
     }, [snapshots])
-
-    // =========================
-    // LIVE MAP
     // =========================
 
+    // LIVE MAP// =========================
     const liveMap = useMemo(() => {
         const map = {}
 
@@ -229,11 +227,9 @@ export default function GaiconDashboard() {
 
         return map
     }, [liveCandidates])
-
-    // =========================
-    // NEXT
     // =========================
 
+    // NEXT// =========================
     const handleNext = async () => {
         if (!nextCursor || loading) return
 
@@ -245,11 +241,9 @@ export default function GaiconDashboard() {
 
         await loadTimeline(nextCursor)
     }
-
-    // =========================
-    // PREVIOUS
     // =========================
 
+    // PREVIOUS// =========================
     const handlePrevious = async () => {
         if (page <= 1 || loading) return
 
@@ -263,25 +257,29 @@ export default function GaiconDashboard() {
 
         await loadTimeline(previousCursor)
     }
-
-    // =========================
-    // CURRENT AWARD
     // =========================
 
+    // CURRENT AWARD// =========================
     const currentAward = awards.find((award) => award.award_id === selectedAward)
 
     return (
         <div
             style={{
                 minHeight: '100vh',
+
                 background: 'linear-gradient(135deg, #050505 0%, #111111 65%, #2a1145 100%)',
+
                 color: '#fff',
+
                 display: 'flex',
+
                 flexDirection: 'column',
+
                 boxSizing: 'border-box',
             }}
         >
             {/* HEADER */}
+
             <div
                 style={{
                     marginBottom: 25,
@@ -290,8 +288,11 @@ export default function GaiconDashboard() {
                 <h2
                     style={{
                         margin: 0,
+
                         fontSize: 28,
+
                         fontWeight: 800,
+
                         letterSpacing: 1,
                     }}
                 >
@@ -300,29 +301,43 @@ export default function GaiconDashboard() {
             </div>
 
             {/* FILTERS */}
+
             <div
                 style={{
                     display: 'flex',
+
                     gap: 12,
+
                     alignItems: 'center',
+
                     flexWrap: 'wrap',
+
                     marginBottom: 25,
                 }}
             >
                 {/* AWARD */}
+
                 <select
                     value={selectedAward}
                     onChange={(e) => setSelectedAward(e.target.value)}
                     disabled={loadingAwards}
                     style={{
                         padding: '10px 14px',
+
                         borderRadius: 10,
+
                         border: '1px solid #6b21a8',
+
                         background: '#18111f',
+
                         color: '#fff',
+
                         fontSize: 14,
+
                         fontWeight: 600,
+
                         outline: 'none',
+
                         cursor: 'pointer',
                     }}
                 >
@@ -334,10 +349,14 @@ export default function GaiconDashboard() {
                 </select>
 
                 {/* INTERVAL BUTTONS */}
+
                 {[
                     { value: '15m', label: '15 phút' },
+
                     { value: '1h', label: '1 giờ' },
+
                     { value: '6h', label: '6 giờ' },
+
                     { value: '1d', label: '1 ngày' },
                 ].map((item) => (
                     <button
@@ -345,11 +364,17 @@ export default function GaiconDashboard() {
                         onClick={() => setInterval(item.value)}
                         style={{
                             padding: '10px 20px',
+
                             borderRadius: 10,
+
                             border: 'none',
+
                             cursor: 'pointer',
+
                             fontWeight: 'bold',
+
                             fontSize: 14,
+
                             color: '#fff',
 
                             background: interval === item.value ? 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)' : 'linear-gradient(135deg, #c084fc 0%, #d8b4fe 100%)',
@@ -365,11 +390,14 @@ export default function GaiconDashboard() {
             </div>
 
             {/* TABLE */}
+
             {loading ? (
                 <div
                     style={{
                         padding: 40,
+
                         textAlign: 'center',
+
                         color: '#c084fc',
                     }}
                 >
@@ -379,17 +407,24 @@ export default function GaiconDashboard() {
                 <div
                     style={{
                         overflowX: 'auto',
+
                         borderRadius: 14,
+
                         border: '1px solid #3b2454',
+
                         background: 'rgba(15, 10, 20, 0.75)',
+
                         boxShadow: '0 8px 30px rgba(0,0,0,.35)',
                     }}
                 >
                     <table
                         style={{
                             width: '100%',
+
                             borderCollapse: 'collapse',
+
                             textAlign: 'center',
+
                             minWidth: 900,
                         }}
                     >
@@ -402,12 +437,19 @@ export default function GaiconDashboard() {
                                 <th
                                     style={{
                                         padding: '14px 18px',
+
                                         textAlign: 'left',
+
                                         position: 'sticky',
+
                                         left: 0,
+
                                         background: '#24103a',
+
                                         zIndex: 2,
+
                                         minWidth: 180,
+
                                         borderBottom: '1px solid #5b2a7d',
                                     }}
                                 >
@@ -417,7 +459,9 @@ export default function GaiconDashboard() {
                                 <th
                                     style={{
                                         padding: '14px 18px',
+
                                         minWidth: 110,
+
                                         borderBottom: '1px solid #5b2a7d',
                                     }}
                                 >
@@ -432,13 +476,16 @@ export default function GaiconDashboard() {
                                             key={column}
                                             style={{
                                                 padding: '10px 14px',
+
                                                 minWidth: 100,
+
                                                 borderBottom: '1px solid #5b2a7d',
                                             }}
                                         >
                                             <div
                                                 style={{
                                                     fontSize: 15,
+
                                                     fontWeight: 800,
                                                 }}
                                             >
@@ -448,7 +495,9 @@ export default function GaiconDashboard() {
                                             <div
                                                 style={{
                                                     fontSize: 11,
+
                                                     opacity: 0.65,
+
                                                     marginTop: 3,
                                                 }}
                                             >
@@ -469,15 +518,23 @@ export default function GaiconDashboard() {
                                     }}
                                 >
                                     {/* CANDIDATE */}
+
                                     <td
                                         style={{
                                             padding: '14px 18px',
+
                                             textAlign: 'left',
+
                                             fontWeight: 700,
+
                                             position: 'sticky',
+
                                             left: 0,
+
                                             background: '#120d18',
+
                                             zIndex: 1,
+
                                             borderBottom: '1px solid #2c2035',
                                         }}
                                     >
@@ -485,11 +542,15 @@ export default function GaiconDashboard() {
                                     </td>
 
                                     {/* LIVE */}
+
                                     <td
                                         style={{
                                             padding: '10px 14px',
+
                                             fontWeight: 800,
+
                                             color: '#d8b4fe',
+
                                             borderBottom: '1px solid #2c2035',
                                         }}
                                     >
@@ -497,10 +558,11 @@ export default function GaiconDashboard() {
                                     </td>
 
                                     {/* SNAPSHOTS */}
+
                                     {columns.map((column, index) => {
                                         const current = tableData[candidate.id]?.[column]
-
-                                        const previousColumn = columns[index + 1]
+                                        // Lấy snapshot trước đó theo thứ tự thời gian
+                                        const previousColumn = allColumns[index + 1]
 
                                         const previous = previousColumn ? tableData[candidate.id]?.[previousColumn] : null
 
@@ -515,12 +577,14 @@ export default function GaiconDashboard() {
                                                 key={column}
                                                 style={{
                                                     padding: '10px 14px',
+
                                                     borderBottom: '1px solid #2c2035',
                                                 }}
                                             >
                                                 <div
                                                     style={{
                                                         fontWeight: 800,
+
                                                         fontSize: 14,
                                                     }}
                                                 >
@@ -531,12 +595,16 @@ export default function GaiconDashboard() {
                                                     <div
                                                         style={{
                                                             marginTop: 4,
+
                                                             fontSize: 12,
+
                                                             fontWeight: 600,
+
                                                             color: change > 0 ? '#4ade80' : change < 0 ? '#f87171' : '#9ca3af',
                                                         }}
                                                     >
                                                         {change > 0 ? '+' : ''}
+
                                                         {change.toLocaleString()}
                                                     </div>
                                                 )}
@@ -551,12 +619,17 @@ export default function GaiconDashboard() {
             )}
 
             {/* PAGINATION */}
+
             <div
                 style={{
                     display: 'flex',
+
                     justifyContent: 'center',
+
                     alignItems: 'center',
+
                     gap: 15,
+
                     marginTop: 25,
                 }}
             >
@@ -565,11 +638,17 @@ export default function GaiconDashboard() {
                     disabled={page <= 1 || loading}
                     style={{
                         padding: '9px 18px',
+
                         borderRadius: 9,
+
                         border: '1px solid #6b21a8',
+
                         background: page <= 1 || loading ? '#241c29' : '#3b1760',
+
                         color: page <= 1 || loading ? '#777' : '#fff',
+
                         cursor: page <= 1 || loading ? 'not-allowed' : 'pointer',
+
                         fontWeight: 600,
                     }}
                 >
@@ -579,6 +658,7 @@ export default function GaiconDashboard() {
                 <span
                     style={{
                         fontWeight: 700,
+
                         color: '#d8b4fe',
                     }}
                 >
@@ -590,11 +670,17 @@ export default function GaiconDashboard() {
                     disabled={!nextCursor || loading}
                     style={{
                         padding: '9px 18px',
+
                         borderRadius: 9,
+
                         border: '1px solid #6b21a8',
+
                         background: !nextCursor || loading ? '#241c29' : '#3b1760',
+
                         color: !nextCursor || loading ? '#777' : '#fff',
+
                         cursor: !nextCursor || loading ? 'not-allowed' : 'pointer',
+
                         fontWeight: 600,
                     }}
                 >
@@ -603,22 +689,32 @@ export default function GaiconDashboard() {
             </div>
 
             {/* FOOTER */}
+
             <footer
                 style={{
                     width: '100%',
+
                     padding: '18px 30px',
+
                     marginTop: '30px',
+
                     boxSizing: 'border-box',
+
                     textAlign: 'center',
+
                     background: 'rgba(42, 17, 69, 0.35)',
+
                     borderTop: '1px solid rgba(168, 85, 247, 0.18)',
+
                     backdropFilter: 'blur(8px)',
+
                     WebkitBackdropFilter: 'blur(8px)',
                 }}
             >
                 <div
                     style={{
                         fontSize: '14px',
+
                         fontWeight: 600,
                     }}
                 >
@@ -628,7 +724,9 @@ export default function GaiconDashboard() {
                 <div
                     style={{
                         marginTop: '4px',
+
                         fontSize: '13px',
+
                         opacity: 0.65,
                     }}
                 >
